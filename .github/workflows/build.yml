@@ -1,0 +1,78 @@
+name: Build AES Static Libraries
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build:
+    name: Build for ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux64
+            os: ubuntu-latest
+            cc: gcc
+            ar: ar
+            ext: .a
+
+          - target: linuxArm64
+            os: ubuntu-latest
+            cc: aarch64-linux-gnu-gcc
+            ar: aarch64-linux-gnu-ar
+            ext: .a
+
+          - target: windows64
+            os: windows-latest
+            cc: x86_64-w64-mingw32-gcc
+            ar: x86_64-w64-mingw32-ar
+            ext: .a
+
+          - target: macarm64
+            os: macos-14
+            cc: clang
+            ar: ar
+            ext: .a
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Linux ARM64 Toolchain
+        if: matrix.target == 'linuxArm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Install Windows MinGW Toolchain
+        if: matrix.target == 'windows64'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc make
+
+      - name: Compile and Package (Linux & macOS & Cross-compilers)
+        if: matrix.target != 'windows64'
+        run: |
+          mkdir -p build/${{ matrix.target }}
+          ${{ matrix.cc }} -Wall -Os -c aes.c -o build/${{ matrix.target }}/aes.o
+          ${{ matrix.ar }} rcs build/${{ matrix.target }}/libaes${{ matrix.ext }} build/${{ matrix.target }}/aes.o
+
+      - name: Compile and Package (Windows MSYS2)
+        if: matrix.target == 'windows64'
+        shell: msys2 {0}
+        run: |
+          mkdir -p build/${{ matrix.target }}
+          ${{ matrix.cc }} -Wall -Os -c aes.c -o build/${{ matrix.target }}/aes.o
+          ${{ matrix.ar }} rcs build/${{ matrix.target }}/libaes${{ matrix.ext }} build/${{ matrix.target }}/aes.o
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libaes-${{ matrix.target }}
+          path: build/${{ matrix.target }}/libaes${{ matrix.ext }}
