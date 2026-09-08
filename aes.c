@@ -637,21 +637,23 @@ void AES_CFB8_decrypt_buffer(
     size_t length
 )
 {
-    uint8_t stream[AES_BLOCKLEN];
+  uint8_t stream[AES_BLOCKLEN];
 
-    size_t i;
+  for (size_t i = 0; i < length; ++i)
+  {
+    uint8_t ciphertext = buf[i];
+    memcpy(stream, ctx->Iv, AES_BLOCKLEN);
+    Cipher((state_t*)stream, ctx->RoundKey);
 
-    for (i = 0; i < length; ++i)
-    {
-        memcpy(stream, ctx->Iv, AES_BLOCKLEN);
-        Cipher((state_t*)stream, ctx->RoundKey);
-        memmove(
-            ctx->Iv,
-            ctx->Iv + 1,
-            AES_BLOCKLEN - 1
-        );
-        ctx->Iv[AES_BLOCKLEN - 1] = ciphertext;
-    }
+    buf[i] = ciphertext ^ stream[0];
+
+    memmove(
+        ctx->Iv,
+        ctx->Iv + 1,
+        AES_BLOCKLEN - 1
+    );
+    ctx->Iv[AES_BLOCKLEN - 1] = ciphertext;
+  }
 }
 
 #endif // CFB8
