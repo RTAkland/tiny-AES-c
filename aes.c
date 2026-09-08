@@ -570,3 +570,88 @@ void AES_CTR_xcrypt_buffer(struct AES_ctx* ctx, uint8_t* buf, size_t length)
 
 #endif // #if defined(CTR) && (CTR == 1)
 
+#if defined(CFB8) && (CFB8 == 1)
+
+/*
+ * AES-128 CFB8 encryption.
+ *
+ * CFB8 operates on one byte at a time.
+ *
+ * feedback = IV
+ *
+ * For each byte:
+ *
+ *   AES_encrypt(feedback)
+ *   ciphertext = plaintext ^ encrypted_feedback[0]
+ *   feedback <<= 8 bits
+ *   feedback[15] = ciphertext
+ */
+void AES_CFB8_encrypt_buffer(
+    struct AES_ctx* ctx,
+    uint8_t* buf,
+    size_t length
+)
+{
+    uint8_t stream[AES_BLOCKLEN];
+
+    size_t i;
+
+    for (i = 0; i < length; ++i)
+    {
+        /*
+         * Encrypt current feedback register.
+         */
+        memcpy(stream, ctx->Iv, AES_BLOCKLEN);
+        Cipher((state_t*)stream, ctx->RoundKey);
+
+        /*
+         * Save ciphertext before overwriting buf[i].
+         */
+        uint8_t ciphertext = buf[i] ^ stream[0];
+
+        /*
+         * Shift feedback register left by one byte.
+         */
+        memmove(
+            ctx->Iv,
+            ctx->Iv + 1,
+            AES_BLOCKLEN - 1
+        );
+
+        /*
+         * Append ciphertext to feedback register.
+         */
+        ctx->Iv[AES_BLOCKLEN - 1] = ciphertext;
+
+        /*
+         * Write ciphertext.
+         */
+        buf[i] = ciphertext;
+    }
+}
+
+
+void AES_CFB8_decrypt_buffer(
+    struct AES_ctx* ctx,
+    uint8_t* buf,
+    size_t length
+)
+{
+    uint8_t stream[AES_BLOCKLEN];
+
+    size_t i;
+
+    for (i = 0; i < length; ++i)
+    {
+        memcpy(stream, ctx->Iv, AES_BLOCKLEN);
+        Cipher((state_t*)stream, ctx->RoundKey);
+        memmove(
+            ctx->Iv,
+            ctx->Iv + 1,
+            AES_BLOCKLEN - 1
+        );
+        ctx->Iv[AES_BLOCKLEN - 1] = ciphertext;
+    }
+}
+
+#endif // CFB8
